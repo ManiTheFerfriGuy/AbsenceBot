@@ -35,7 +35,7 @@ cp config.example.toml config.toml
 ### 5) Configure settings
 Edit `config.toml` and set:
 - `token`: Telegram bot token from BotFather
-- `authorized_teachers`: list of Telegram user IDs
+- `authorized_teacher_ids`: list of Telegram user IDs
 - `database`: keep SQLite defaults or provide MySQL credentials
 
 ### 6) Run the bot
@@ -43,18 +43,12 @@ Edit `config.toml` and set:
 python run_bot.py config.toml
 ```
 
-## Install on cPanel (Recommended for Shared Hosting)
+## Install on cPanel (Command Line Start)
 ### 1) Upload files
 - Download or clone the repository.
 - Upload the project to your cPanel home directory (e.g., `~/absencebot`).
 
-### 2) Create the Python app
-In **Setup Python App**:
-- **Python version:** 3.9+
-- **Application root:** `/home/<user>/absencebot`
-- **Startup file:** `run_bot.py`
-
-### 3) Install dependencies in cPanel
+### 2) Install dependencies in cPanel
 From cPanel Terminal (or SSH):
 ```bash
 cd ~/absencebot
@@ -63,31 +57,42 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4) Create the database (MySQL/MariaDB)
+### 3) Create the database (MySQL/MariaDB)
 Use **MySQL Database Wizard**:
 1. Create a database (e.g., `absence_bot`).
 2. Create a database user.
 3. Grant **ALL PRIVILEGES** for that user on the database.
 4. Record **host**, **username**, **password**, and **database name**.
 
-### 5) Configure the bot
+### 4) Configure the bot
 ```bash
 cp config.example.toml config.toml
 ```
 Update `config.toml` with:
 - `token`
-- `authorized_teachers`
+- `authorized_teacher_ids`
+- `grades`
 - MySQL connection credentials
 
-### 6) Start the bot (long polling)
+### 5) Start the bot (long polling)
+Run the bot directly from the terminal:
 ```bash
-python run_bot.py config.toml
+cd ~/absencebot
+source venv/bin/activate
+nohup python run_bot.py config.toml > bot.log 2>&1 &
+```
+
+### 6) Verify it is running
+```bash
+ps -u "$USER" -f | grep run_bot.py
+tail -n 50 bot.log
 ```
 
 ### 7) Keep the bot running
-Use one of the following (depending on host support):
-- **Process manager** offered by your cPanel host.
-- **Cron job** that restarts the bot if it stops.
+If your host does not keep background processes alive, add a cron job that restarts it:
+```bash
+*/5 * * * * cd /home/<user>/absencebot && ./venv/bin/python run_bot.py config.toml >> /home/<user>/absencebot/bot.log 2>&1
+```
 
 ## Database Options
 ### SQLite (default)

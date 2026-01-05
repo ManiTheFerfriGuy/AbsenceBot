@@ -10,14 +10,15 @@ All settings live in `config.toml`. Copy from `config.example.toml` and edit.
   authorized_teacher_ids = [123456789, 555555555]
   ```
 
-## Change Grades or Majors
+## Change Grades
 - Update `bot.grades`:
   ```toml
-  [bot.grades]
-  "10th Grade" = ["Computer Science", "Business"]
-  "11th Grade" = ["Mathematics"]
-  "12th Grade" = ["Literature", "Biology"]
+  grades = ["10th Grade", "11th Grade", "12th Grade"]
   ```
+
+## Manage Majors
+- Majors are managed inside the bot UI.
+- Use **Manage Students → Manage Majors** to add or remove majors per grade.
 
 ## Database Settings
 - For MySQL:

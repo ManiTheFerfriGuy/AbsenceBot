@@ -8,6 +8,13 @@ CREATE TABLE students (
     UNIQUE KEY uq_student_name_grade_major (full_name, grade, major)
 );
 
+CREATE TABLE majors (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    grade VARCHAR(20) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    UNIQUE KEY uq_major_grade_name (grade, name)
+);
+
 CREATE TABLE absences (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_id VARCHAR(32) NOT NULL,

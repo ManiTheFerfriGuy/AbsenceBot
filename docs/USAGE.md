@@ -30,7 +30,12 @@ Options:
 2. Select **Grade** → **Major**
 3. Students are listed with pagination.
 
-### 5. Record Absence
+### 5. Manage Majors
+1. **Manage Students → Manage Majors**
+2. Select a **Grade**.
+3. Add majors or delete unused majors.
+
+### 6. Record Absence
 1. **Record Absence**
 2. Select **Grade** → **Major**
 3. Tap students to toggle their absence.
