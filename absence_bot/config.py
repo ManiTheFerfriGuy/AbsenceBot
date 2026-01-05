@@ -16,12 +16,6 @@ else:  # pragma: no cover
 
 @dataclass(frozen=True)
 class DatabaseConfig:
-    engine: str
-    host: str
-    port: int
-    name: str
-    user: str
-    password: str
     sqlite_path: str
 
 
@@ -30,6 +24,7 @@ class BotConfig:
     token: str
     timezone: str
     authorized_teacher_ids: List[int]
+    management_user_ids: List[int]
     grades: List[str]
     page_size: int
     database: DatabaseConfig
@@ -56,6 +51,12 @@ def load_config(path: str | Path) -> BotConfig:
     ):
         raise ConfigError("authorized_teacher_ids must be a list of integers.")
 
+    management_ids = bot.get("management_user_ids", [])
+    if not isinstance(management_ids, list) or not all(
+        isinstance(item, int) for item in management_ids
+    ):
+        raise ConfigError("management_user_ids must be a list of integers.")
+
     grades = bot.get("grades", [])
     if not isinstance(grades, list) or not grades or not all(
         isinstance(grade, str) for grade in grades
@@ -72,15 +73,10 @@ def load_config(path: str | Path) -> BotConfig:
         token=str(bot.get("token", "")).strip(),
         timezone=timezone,
         authorized_teacher_ids=authorized_ids,
+        management_user_ids=management_ids,
         grades=[str(grade) for grade in grades],
         page_size=int(bot.get("page_size", 10)),
         database=DatabaseConfig(
-            engine=str(database.get("engine", "sqlite")),
-            host=str(database.get("host", "localhost")),
-            port=int(database.get("port", 3306)),
-            name=str(database.get("name", "absence_bot")),
-            user=str(database.get("user", "")),
-            password=str(database.get("password", "")),
             sqlite_path=str(database.get("sqlite_path", "absence_bot.sqlite3")),
         ),
     )

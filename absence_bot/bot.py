@@ -2,13 +2,20 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from pathlib import Path
 
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from absence_bot.config import ConfigError, load_config
 from absence_bot.database import create_database
-from absence_bot.handlers import HandlerContext, handle_callback, handle_message, start
+from absence_bot.handlers import (
+    HandlerContext,
+    handle_callback,
+    handle_message,
+    scheduled_database_export,
+    start,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +37,12 @@ def build_application(config_path: str | Path) -> Application:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.job_queue.run_repeating(
+        scheduled_database_export,
+        interval=timedelta(hours=12),
+        first=timedelta(hours=12),
+        name="automatic-database-export",
+    )
 
     return application
 

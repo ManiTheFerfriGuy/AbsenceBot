@@ -35,7 +35,7 @@
 
 ## 2. Tech Stack
 
-**Summary:** Python + `python-telegram-bot` with SQLAlchemy and MySQL/SQLite for cPanel compatibility.
+**Summary:** Python + `python-telegram-bot` with SQLAlchemy and SQLite for cPanel compatibility.
 
 **Backend**
 - **Python 3.9+**: Widely supported on cPanel.
@@ -43,8 +43,7 @@
 - **SQLAlchemy**: ORM to reduce raw SQL and support multiple databases (Security Checklist #8).
 
 **Database**
-- **MySQL (production)**: Default for cPanel.
-- **SQLite (development)**: Simple local development.
+- **SQLite**: Simple local development and production storage with zero external setup.
 
 **Why This Stack**
 - Minimal dependencies, easy deployment, and strong community support.
@@ -78,7 +77,7 @@ Main Menu
       └─ Confirm → Store Absence (dedupe per day)
 
 Data Flow:
-Telegram Update → Bot Handler → Validation → Database (MySQL/SQLite)
+Telegram Update → Bot Handler → Validation → Database (SQLite)
 ```
 
 ---

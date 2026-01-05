@@ -5,17 +5,13 @@
 "timezone" = "UTC"
 # Authorized teacher Telegram user IDs
 "authorized_teacher_ids" = [123456789, 987654321]
+# Management Telegram user IDs (access to admin tools)
+"management_user_ids" = [111111111]
 # Number of students per page in inline menus
 "page_size" = 10
 # Grades available in the bot (majors are managed in the bot UI)
 "grades" = ["10th Grade", "11th Grade", "12th Grade"]
 
 [database]
-# Supported engines: "mysql" or "sqlite"
-"engine" = "sqlite"
-"host" = "localhost"
-"port" = 3306
-"name" = "absence_bot"
-"user" = "absence_bot"
-"password" = "CHANGE_ME"
+# SQLite database path (auto-created if missing)
 "sqlite_path" = "absence_bot.sqlite3"
