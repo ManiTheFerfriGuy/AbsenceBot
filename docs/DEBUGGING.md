@@ -30,16 +30,13 @@ Use this guide if the bot does not start or does not respond. Each issue include
 
 ---
 
-## 3) “ABSENCEBOT_GRADES must include at least one grade name”
+## 3) No grades appear in the bot
 **Symptoms**
-- Bot stops during startup.
+- Grade list is empty.
 
 **Fix**
-1. Provide a comma-separated list of grades:
-   ```bash
-   export ABSENCEBOT_GRADES="Grade 10,Grade 11,Grade 12"
-   ```
-2. Restart the bot.
+1. Open **Manage Grades** from the bot menu.
+2. Add the grade names you need.
 
 ---
 
@@ -148,11 +145,3 @@ Use this guide if the bot does not start or does not respond. Each issue include
 2. Remove duplicate cron entries.
 
 ---
-
-## 12) No grades appear in the bot
-**Symptoms**
-- Grade list is empty.
-
-**Fix**
-1. Verify `ABSENCEBOT_GRADES` is set in the same environment where the bot runs.
-2. Restart the bot after updating.

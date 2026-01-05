@@ -28,7 +28,6 @@ pip install -r requirements.txt
 ### Step 3: Set your environment variables
 ```bash
 export ABSENCEBOT_TOKEN="your-telegram-token"
-export ABSENCEBOT_GRADES="Grade 10,Grade 11"
 export ABSENCEBOT_MANAGEMENT_USER_IDS="123456789"
 export ABSENCEBOT_AUTH_TEACHER_IDS="123456789,987654321"
 ```
@@ -41,6 +40,7 @@ python -m absence_bot
 ### Step 5: Check it
 - Open Telegram and send `/start` to your bot.
 - If you see the menu, the install worked.
+- Use **Manage Grades** in the bot to add grades.
 
 ---
 
@@ -72,7 +72,6 @@ python -m absence_bot
 ### Step 4: Add environment variables (no config file)
 In **Setup Python App**, scroll to **Environment variables** and add:
 - `ABSENCEBOT_TOKEN` = your Telegram bot token
-- `ABSENCEBOT_GRADES` = `Grade 10,Grade 11`
 - `ABSENCEBOT_MANAGEMENT_USER_IDS` = `123456789`
 - `ABSENCEBOT_AUTH_TEACHER_IDS` = `123456789,987654321`
 
@@ -103,7 +102,6 @@ pip install -r requirements.txt
 ### Step 2: Set environment variables
 ```bash
 export ABSENCEBOT_TOKEN="your-telegram-token"
-export ABSENCEBOT_GRADES="Grade 10,Grade 11"
 export ABSENCEBOT_MANAGEMENT_USER_IDS="123456789"
 export ABSENCEBOT_AUTH_TEACHER_IDS="123456789,987654321"
 ```
@@ -118,6 +116,9 @@ nohup /home/<user>/absencebot/venv/bin/python -m absence_bot > /home/<user>/abse
 ps -u "$USER" -f | grep absence_bot
 tail -n 50 /home/<user>/absencebot/bot.log
 ```
+
+### Step 5: Add grades in the bot
+- Open **Manage Grades** from the bot menu to add your grade list.
 
 ### Step 5: Keep it running (optional cron fallback)
 If your host stops background jobs, add a cron job:
