@@ -1,6 +1,5 @@
 __pycache__/
 *.pyc
 .venv/
-config.toml
 absence_bot.sqlite3
 *.log

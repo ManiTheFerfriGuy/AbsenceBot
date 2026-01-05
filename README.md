@@ -10,23 +10,25 @@ AbsenceBot is a production-ready Telegram bot for managing school absences. It u
 - Clear documentation and testing report
 
 ## Quick Start
-1. Copy the config template:
-   ```bash
-   cp config.example.toml config.toml
-   ```
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
+2. Set the required environment variables:
+   ```bash
+   export ABSENCEBOT_TOKEN="your-telegram-token"
+   export ABSENCEBOT_GRADES="Grade 10,Grade 11"
+   ```
 3. Run the bot:
    ```bash
-   python -m absence_bot config.toml
+   python -m absence_bot
    ```
 
 ## Documentation
 - [Installation Guide](docs/INSTALLATION.md)
 - [Configuration Guide](docs/CONFIGURATION.md)
 - [Usage Guide](docs/USAGE.md)
+- [Debugging & Bugs](docs/DEBUGGING.md)
 - [Database Schema](docs/database_schema.sql)
 - [Testing Report](docs/TESTING_REPORT.md)
 - [Scalability Notes](docs/SCALABILITY.md)

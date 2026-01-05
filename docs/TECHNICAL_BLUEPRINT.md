@@ -13,7 +13,7 @@
 - **Secondary:** School administrators who manage configuration and reports.
 
 **Core Features**
-- Teacher authentication via config file.
+- Teacher authentication via environment variables.
 - Student roster management by grade and major.
 - Absence recording with duplicate prevention for the same day.
 - Error-safe, inline keyboard navigation.
@@ -52,8 +52,8 @@
 **Security Checklist Integration**
 - **Auth library**: Telegram authentication via user IDs; no custom auth system.
 - **Protected endpoints**: Every update is checked for authorized user ID.
-- **No secrets in frontend**: Bot token and DB creds stored in config only.
-- **Secrets in `.gitignore`**: `config.toml` is ignored.
+- **No secrets in frontend**: Bot token and DB creds stored in environment variables only.
+- **Secrets in `.gitignore`**: keep environment variables out of version control.
 - **Sanitized errors**: Generic error responses to users.
 - **RBAC**: Teacher-only access enforced (role-based via ID list).
 - **HTTPS**: Webhook deployments should enforce HTTPS.
@@ -100,7 +100,7 @@ Telegram Update → Bot Handler → Validation → Database (SQLite)
 **Summary:** Incremental milestones with clear dependencies.
 
 1. **Setup & Foundation (Day 1)**
-   - Create repo structure, configs, logging, and base bot runner.
+   - Create repo structure, environment configuration, logging, and base bot runner.
 2. **Database Layer (Day 2)**
    - Define models and schema.
    - Implement ORM and migrations (optional).
@@ -136,9 +136,9 @@ Telegram Update → Bot Handler → Validation → Database (SQLite)
 - **API Design**: Telegram update handlers act like endpoints.
 - **Data Storage**: SQLAlchemy models with unique constraints.
 - **Security**:
-  - **RBAC**: Teacher ID list in config.
+  - **RBAC**: Teacher ID list in environment variables.
   - **Protected handlers**: Every handler checks authorization.
-  - **No secrets in code**: Tokens and DB creds in config.
+  - **No secrets in code**: Tokens and DB creds in environment variables.
   - **Sanitized errors**: No stack traces to users.
 - **Performance**:
   - Pagination and indexed queries.
@@ -174,8 +174,8 @@ const style = useMemo(() => ({ marginTop: 8 }), []);
 
 1. **Use a battle-tested auth library** – Telegram auth via user IDs; no custom auth logic.
 2. **Lock down protected endpoints** – every update checked against authorized IDs.
-3. **Never expose secrets on the frontend** – token/DB creds only in server config.
-4. **Git-ignore sensitive files** – `config.toml` in `.gitignore`.
+3. **Never expose secrets on the frontend** – token/DB creds only in server environment variables.
+4. **Git-ignore sensitive files** – avoid committing any local env files or secrets.
 5. **Sanitise error messages** – user-facing errors are generic.
 6. **Use middleware auth checks** – centralized authorization check in handlers.
 7. **Add role-based access control (RBAC)** – teacher role enforced by ID list.

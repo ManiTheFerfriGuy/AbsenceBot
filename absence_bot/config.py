@@ -2,16 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+import os
 from typing import List
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-import importlib.util
-
-if importlib.util.find_spec("tomllib"):
-    import tomllib
-else:  # pragma: no cover
-    import tomli as tomllib
 
 
 @dataclass(frozen=True)
@@ -34,49 +27,59 @@ class ConfigError(RuntimeError):
     """Raised when configuration is missing or invalid."""
 
 
-def load_config(path: str | Path) -> BotConfig:
-    config_path = Path(path)
-    if not config_path.exists():
-        raise ConfigError(
-            f"Config file not found at {config_path}. Copy config.example.toml to config.toml."
-        )
+def _parse_csv(value: str) -> List[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
-    data = tomllib.loads(config_path.read_text())
-    database = data.get("database", {})
-    bot = data.get("bot", {})
 
-    authorized_ids = bot.get("authorized_teacher_ids", [])
-    if not isinstance(authorized_ids, list) or not all(
-        isinstance(item, int) for item in authorized_ids
-    ):
-        raise ConfigError("authorized_teacher_ids must be a list of integers.")
+def _parse_int_list(value: str, field_name: str) -> List[int]:
+    entries = _parse_csv(value)
+    ids: List[int] = []
+    for entry in entries:
+        try:
+            ids.append(int(entry))
+        except ValueError as exc:
+            raise ConfigError(f"{field_name} must be a comma-separated list of integers.") from exc
+    return ids
 
-    management_ids = bot.get("management_user_ids", [])
-    if not isinstance(management_ids, list) or not all(
-        isinstance(item, int) for item in management_ids
-    ):
-        raise ConfigError("management_user_ids must be a list of integers.")
 
-    grades = bot.get("grades", [])
-    if not isinstance(grades, list) or not grades or not all(
-        isinstance(grade, str) for grade in grades
-    ):
-        raise ConfigError("grades must be a list of grade names.")
+def load_config() -> BotConfig:
+    token = os.getenv("ABSENCEBOT_TOKEN", "").strip()
+    timezone = os.getenv("ABSENCEBOT_TIMEZONE", "UTC").strip() or "UTC"
+    grades = _parse_csv(os.getenv("ABSENCEBOT_GRADES", ""))
+    if not grades:
+        raise ConfigError("ABSENCEBOT_GRADES must include at least one grade name.")
 
-    timezone = str(bot.get("timezone", "UTC"))
     try:
         ZoneInfo(timezone)
     except ZoneInfoNotFoundError as exc:
         raise ConfigError(f"Invalid timezone: {timezone}") from exc
 
+    page_size_raw = os.getenv("ABSENCEBOT_PAGE_SIZE", "10").strip() or "10"
+    try:
+        page_size = int(page_size_raw)
+    except ValueError as exc:
+        raise ConfigError("ABSENCEBOT_PAGE_SIZE must be an integer.") from exc
+
+    if page_size <= 0:
+        raise ConfigError("ABSENCEBOT_PAGE_SIZE must be greater than zero.")
+
     return BotConfig(
-        token=str(bot.get("token", "")).strip(),
+        token=token,
         timezone=timezone,
-        authorized_teacher_ids=authorized_ids,
-        management_user_ids=management_ids,
-        grades=[str(grade) for grade in grades],
-        page_size=int(bot.get("page_size", 10)),
+        authorized_teacher_ids=_parse_int_list(
+            os.getenv("ABSENCEBOT_AUTH_TEACHER_IDS", ""),
+            "ABSENCEBOT_AUTH_TEACHER_IDS",
+        ),
+        management_user_ids=_parse_int_list(
+            os.getenv("ABSENCEBOT_MANAGEMENT_USER_IDS", ""),
+            "ABSENCEBOT_MANAGEMENT_USER_IDS",
+        ),
+        grades=grades,
+        page_size=page_size,
         database=DatabaseConfig(
-            sqlite_path=str(database.get("sqlite_path", "absence_bot.sqlite3")),
+            sqlite_path=os.getenv("ABSENCEBOT_DB_PATH", "absence_bot.sqlite3").strip()
+            or "absence_bot.sqlite3",
         ),
     )

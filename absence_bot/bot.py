@@ -1,11 +1,8 @@
 """Main application setup for AbsenceBot."""
 from __future__ import annotations
 
-import argparse
 import logging
-import os
 from datetime import timedelta
-from pathlib import Path
 
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
@@ -21,14 +18,11 @@ from absence_bot.handlers import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = "config.toml"
-ENV_CONFIG_PATH = "ABSENCEBOT_CONFIG"
 
-
-def build_application(config_path: str | Path) -> Application:
-    config = load_config(config_path)
+def build_application() -> Application:
+    config = load_config()
     if not config.token:
-        raise ConfigError("Bot token missing in config.")
+        raise ConfigError("ABSENCEBOT_TOKEN is missing.")
 
     try:
         database = create_database(config.database)
@@ -59,35 +53,20 @@ def build_application(config_path: str | Path) -> Application:
     return application
 
 
-def run(config_path: str | Path) -> None:
+def run() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
         force=True,
     )
-    LOGGER.info("Loading configuration from %s", config_path)
-    application = build_application(config_path)
+    LOGGER.info("Loading configuration from environment variables")
+    application = build_application()
     LOGGER.info("Starting AbsenceBot")
     application.run_polling()
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run AbsenceBot with the provided config.")
-    parser.add_argument(
-        "config",
-        nargs="?",
-        default=os.getenv(ENV_CONFIG_PATH, DEFAULT_CONFIG_PATH),
-        help=(
-            "Path to the config TOML file. Defaults to config.toml or the "
-            "ABSENCEBOT_CONFIG environment variable."
-        ),
-    )
-    return parser.parse_args()
-
-
 def main() -> None:
-    args = parse_args()
-    run(args.config)
+    run()
 
 
 if __name__ == "__main__":
