@@ -36,6 +36,13 @@ class Major(Base):
     )
 
 
+class Grade(Base):
+    __tablename__ = "grades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+
+
 class Absence(Base):
     __tablename__ = "absences"
 
