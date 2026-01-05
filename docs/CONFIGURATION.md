@@ -7,7 +7,6 @@ AbsenceBot is configured entirely through environment variables. There is no con
 | Variable | Description | Example |
 | --- | --- | --- |
 | `ABSENCEBOT_TOKEN` | Telegram bot token from BotFather | `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11` |
-| `ABSENCEBOT_GRADES` | Comma-separated list of grade names | `Grade 10,Grade 11,Grade 12` |
 
 ## Optional Environment Variables
 | Variable | Description | Default |
@@ -22,3 +21,4 @@ AbsenceBot is configured entirely through environment variables. There is no con
 - Use commas between values, no brackets.
 - Example list: `123456,7891011`.
 - If a variable is missing or invalid, the bot will stop with a clear error message.
+- Grades are managed inside the bot (Manage Grades) rather than through environment variables.

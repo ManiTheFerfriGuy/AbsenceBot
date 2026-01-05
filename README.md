@@ -17,12 +17,12 @@ AbsenceBot is a production-ready Telegram bot for managing school absences. It u
 2. Set the required environment variables:
    ```bash
    export ABSENCEBOT_TOKEN="your-telegram-token"
-   export ABSENCEBOT_GRADES="Grade 10,Grade 11"
    ```
 3. Run the bot:
    ```bash
    python -m absence_bot
    ```
+4. Add grades from the bot's **Manage Grades** menu once it is running.
 
 ## Documentation
 - [Installation Guide](docs/INSTALLATION.md)
