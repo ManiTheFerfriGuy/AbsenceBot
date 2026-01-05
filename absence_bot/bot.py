@@ -58,7 +58,9 @@ def run(config_path: str | Path) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        force=True,
     )
+    LOGGER.info("Loading configuration from %s", config_path)
     application = build_application(config_path)
     LOGGER.info("Starting AbsenceBot")
     application.run_polling()
