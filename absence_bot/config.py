@@ -18,7 +18,6 @@ class BotConfig:
     timezone: str
     authorized_teacher_ids: List[int]
     management_user_ids: List[int]
-    grades: List[str]
     page_size: int
     database: DatabaseConfig
 
@@ -47,10 +46,6 @@ def _parse_int_list(value: str, field_name: str) -> List[int]:
 def load_config() -> BotConfig:
     token = os.getenv("ABSENCEBOT_TOKEN", "").strip()
     timezone = os.getenv("ABSENCEBOT_TIMEZONE", "UTC").strip() or "UTC"
-    grades = _parse_csv(os.getenv("ABSENCEBOT_GRADES", ""))
-    if not grades:
-        raise ConfigError("ABSENCEBOT_GRADES must include at least one grade name.")
-
     try:
         ZoneInfo(timezone)
     except ZoneInfoNotFoundError as exc:
@@ -76,7 +71,6 @@ def load_config() -> BotConfig:
             os.getenv("ABSENCEBOT_MANAGEMENT_USER_IDS", ""),
             "ABSENCEBOT_MANAGEMENT_USER_IDS",
         ),
-        grades=grades,
         page_size=page_size,
         database=DatabaseConfig(
             sqlite_path=os.getenv("ABSENCEBOT_DB_PATH", "absence_bot.sqlite3").strip()
