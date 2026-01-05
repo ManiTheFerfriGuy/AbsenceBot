@@ -10,7 +10,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from absence_bot.config import DatabaseConfig
-from absence_bot.models import Base, Grade
+from absence_bot.models import Base
 
 
 @dataclass
@@ -28,17 +28,6 @@ def create_database(config: DatabaseConfig) -> Database:
     engine = create_engine(url, pool_pre_ping=True, future=True)
     Base.metadata.create_all(engine)
     return Database(engine=engine, session_factory=sessionmaker(bind=engine, expire_on_commit=False))
-
-
-def seed_grades(database: Database, grades: list[str]) -> None:
-    if not grades:
-        return
-    with session_scope(database) as session:
-        existing = session.query(Grade).first()
-        if existing:
-            return
-        unique_grades = {grade.strip() for grade in grades if grade.strip()}
-        session.add_all([Grade(name=grade) for grade in sorted(unique_grades)])
 
 
 @contextmanager

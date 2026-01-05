@@ -539,7 +539,7 @@ def _fetch_grades(handler_context: HandlerContext) -> list[str]:
         grades = session.query(Grade).order_by(Grade.name.asc()).all()
     if grades:
         return [grade.name for grade in grades]
-    return handler_context.config.grades
+    return []
 
 
 async def _show_major_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
