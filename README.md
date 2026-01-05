@@ -20,7 +20,7 @@ AbsenceBot is a production-ready Telegram bot for managing school absences. It u
    ```
 3. Run the bot:
    ```bash
-   python bot.py config.toml
+   python -m absence_bot config.toml
    ```
 
 ## Documentation
