@@ -17,16 +17,22 @@ from telegram.ext import ContextTypes
 from absence_bot.config import BotConfig
 from absence_bot.database import Database, session_scope
 from absence_bot.keyboards import build_menu, paginated_buttons, simple_button
-from absence_bot.models import Absence, AuthorizedTeacher, Major, Student
+from absence_bot.models import Absence, AuthorizedTeacher, Grade, Major, Student
 
 LOGGER = logging.getLogger(__name__)
 
 STATE_ADDING_STUDENTS = "adding_students"
 STATE_ABSENCE_SELECTION = "absence_selection"
+STATE_ADDING_GRADE = "adding_grade"
 STATE_ADDING_MAJOR = "adding_major"
 STATE_ADDING_TEACHER = "adding_teacher"
+STATE_EDITING_GRADE = "editing_grade"
+STATE_EDITING_MAJOR = "editing_major"
+STATE_EDITING_STUDENT = "editing_student"
 STATE_GRADE = "selected_grade"
+STATE_MANAGE_GRADES = "manage_grades"
 STATE_MANAGE_MAJORS = "manage_majors"
+STATE_MANAGE_STUDENTS = "manage_students"
 STATE_MAJOR = "selected_major"
 STATE_PAGE = "page"
 STATE_SELECTED_STUDENTS = "selected_students"
@@ -67,11 +73,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "An unexpected error occurred. Please try again later."
             )
         return
+    if context.user_data.get(STATE_ADDING_GRADE):
+        if not _is_management(update.effective_user.id, handler_context.config):
+            await update.message.reply_text("🚫 You are not authorized to manage grades.")
+            context.user_data.pop(STATE_ADDING_GRADE, None)
+            return
+        try:
+            await _handle_grade_input(update, context, handler_context)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Error handling grade input: %s", exc)
+            await update.message.reply_text(
+                "An unexpected error occurred. Please try again later."
+            )
+        return
+    if context.user_data.get(STATE_EDITING_GRADE):
+        if not _is_management(update.effective_user.id, handler_context.config):
+            await update.message.reply_text("🚫 You are not authorized to manage grades.")
+            context.user_data.pop(STATE_EDITING_GRADE, None)
+            return
+        try:
+            await _handle_grade_edit(update, context, handler_context)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Error handling grade edit: %s", exc)
+            await update.message.reply_text(
+                "An unexpected error occurred. Please try again later."
+            )
+        return
     if context.user_data.get(STATE_ADDING_MAJOR):
         try:
             await _handle_major_input(update, context, handler_context)
         except Exception as exc:  # noqa: BLE001
             LOGGER.exception("Error handling major input: %s", exc)
+            await update.message.reply_text(
+                "An unexpected error occurred. Please try again later."
+            )
+        return
+    if context.user_data.get(STATE_EDITING_MAJOR):
+        if not _is_management(update.effective_user.id, handler_context.config):
+            await update.message.reply_text("🚫 You are not authorized to manage majors.")
+            context.user_data.pop(STATE_EDITING_MAJOR, None)
+            return
+        try:
+            await _handle_major_edit(update, context, handler_context)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Error handling major edit: %s", exc)
+            await update.message.reply_text(
+                "An unexpected error occurred. Please try again later."
+            )
+        return
+    if context.user_data.get(STATE_EDITING_STUDENT):
+        if not _is_management(update.effective_user.id, handler_context.config):
+            await update.message.reply_text("🚫 You are not authorized to manage students.")
+            context.user_data.pop(STATE_EDITING_STUDENT, None)
+            return
+        try:
+            await _handle_student_edit(update, context, handler_context)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Error handling student edit: %s", exc)
             await update.message.reply_text(
                 "An unexpected error occurred. Please try again later."
             )
@@ -112,19 +170,72 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             context.user_data.clear()
             await _show_main_menu(update, context)
             return
+        if data == "menu:data":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to access data tools."
+                )
+                return
+            context.user_data.clear()
+            await _show_data_menu(update, context)
+            return
         if data == "menu:students":
             context.user_data.clear()
             await _show_student_menu(update, context)
             return
         if data == "menu:majors":
             context.user_data.clear()
-            context.user_data[STATE_MANAGE_MAJORS] = True
+            context.user_data[STATE_MANAGE_MAJORS] = "students"
             await _prompt_grade(
                 update,
                 context,
                 title="Select grade to manage majors",
                 back_target="menu:students",
             )
+            return
+        if data == "data:students":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage student data."
+                )
+                return
+            context.user_data.clear()
+            await _show_data_students_menu(update, context)
+            return
+        if data == "data:students_manage":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage student data."
+                )
+                return
+            context.user_data.clear()
+            context.user_data[STATE_MANAGE_STUDENTS] = True
+            await _prompt_grade(update, context, title="Select grade to manage students", back_target="data:students")
+            return
+        if data == "data:majors":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage majors."
+                )
+                return
+            context.user_data.clear()
+            context.user_data[STATE_MANAGE_MAJORS] = "data"
+            await _prompt_grade(
+                update,
+                context,
+                title="Select grade to manage majors",
+                back_target="menu:data",
+            )
+            return
+        if data == "data:grades":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage grades."
+                )
+                return
+            context.user_data.clear()
+            context.user_data[STATE_MANAGE_GRADES] = True
+            await _show_grade_management(update, context)
             return
         if data == "menu:management":
             if not _is_management(update.effective_user.id, handler_context.config):
@@ -150,6 +261,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         if data == "major:add":
             await _start_add_major(update, context)
+            return
+        if data.startswith("major:edit:"):
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to edit majors."
+                )
+                return
+            await _start_edit_major(update, context, data.split(":", 2)[2])
             return
         if data.startswith("major:delete:"):
             await _delete_major(update, context, data.split(":", 2)[2])
@@ -200,6 +319,62 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 reply_markup=keyboard,
             )
             return
+        if data == "grade:add":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage grades."
+                )
+                return
+            await _start_add_grade(update, context)
+            return
+        if data.startswith("grade:delete:"):
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage grades."
+                )
+                return
+            await _delete_grade(update, context, data.split(":", 2)[2])
+            return
+        if data.startswith("grade:edit:"):
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage grades."
+                )
+                return
+            await _start_edit_grade(update, context, data.split(":", 2)[2])
+            return
+        if data.startswith("student:manage:"):
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage students."
+                )
+                return
+            await _show_student_management_actions(update, context, data.split(":", 2)[2])
+            return
+        if data.startswith("student:edit:"):
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage students."
+                )
+                return
+            await _start_edit_student(update, context, data.split(":", 2)[2])
+            return
+        if data.startswith("student:delete:"):
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage students."
+                )
+                return
+            await _delete_student(update, context, data.split(":", 2)[2])
+            return
+        if data == "students:manage":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage students."
+                )
+                return
+            await _show_student_management_list(update, context)
+            return
     except Exception as exc:  # noqa: BLE001
         LOGGER.exception("Error handling callback: %s", exc)
         await update.callback_query.edit_message_text(
@@ -221,7 +396,10 @@ async def _show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             [simple_button("📚 Manage Students", "menu:students")],
             [simple_button("📝 Record Absence", "menu:absence")],
             *(
-                [[simple_button("🛠️ Management", "menu:management")]]
+                [
+                    [simple_button("🗂️ Data", "menu:data")],
+                    [simple_button("🛠️ Management", "menu:management")],
+                ]
                 if show_management
                 else []
             ),
@@ -243,6 +421,29 @@ async def _show_student_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
     )
     await update.callback_query.edit_message_text("Student Management:", reply_markup=keyboard)
+
+
+async def _show_data_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = build_menu(
+        [
+            [simple_button("👥 Students", "data:students")],
+            [simple_button("🎓 Grades", "data:grades")],
+            [simple_button("🧭 Majors", "data:majors")],
+            [simple_button("⬅️ Back", "menu:main")],
+        ]
+    )
+    await update.callback_query.edit_message_text("Data Management:", reply_markup=keyboard)
+
+
+async def _show_data_students_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = build_menu(
+        [
+            [simple_button("➕ Add Students", "students:add")],
+            [simple_button("✏️ Edit/Delete Students", "data:students_manage")],
+            [simple_button("⬅️ Back", "menu:data")],
+        ]
+    )
+    await update.callback_query.edit_message_text("Student Data:", reply_markup=keyboard)
 
 
 async def _show_management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -282,11 +483,15 @@ async def _prompt_grade(
     title: str,
     back_target: str = "menu:main",
 ) -> None:
-    config: BotConfig = context.bot_data["handler_context"].config
-    rows = [
-        [simple_button(grade, f"grade:{grade}")]
-        for grade in config.grades
-    ]
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    grades = _fetch_grades(handler_context)
+    if not grades:
+        await update.callback_query.edit_message_text(
+            "No grades configured yet. Ask a manager to add grades first.",
+            reply_markup=build_menu([[simple_button("⬅️ Back", back_target)]]),
+        )
+        return
+    rows = [[simple_button(grade, f"grade:{grade}")] for grade in grades]
     rows.append([simple_button("⬅️ Back", back_target)])
     keyboard = build_menu(rows)
     await update.callback_query.edit_message_text(title, reply_markup=keyboard)
@@ -305,9 +510,10 @@ async def _handle_grade_selection(
     handler_context: HandlerContext = context.bot_data["handler_context"]
     majors = _fetch_majors(handler_context, grade)
     if not majors:
+        back_target = "data:students" if context.user_data.get(STATE_MANAGE_STUDENTS) else "menu:main"
         await update.callback_query.edit_message_text(
             "No majors configured for this grade. Use Manage Majors to add them.",
-            reply_markup=build_menu([[simple_button("⬅️ Back", "menu:main")]]),
+            reply_markup=build_menu([[simple_button("⬅️ Back", back_target)]]),
         )
         return
 
@@ -328,6 +534,14 @@ def _fetch_majors(handler_context: HandlerContext, grade: str) -> list[str]:
     return [major.name for major in majors]
 
 
+def _fetch_grades(handler_context: HandlerContext) -> list[str]:
+    with session_scope(handler_context.database) as session:
+        grades = session.query(Grade).order_by(Grade.name.asc()).all()
+    if grades:
+        return [grade.name for grade in grades]
+    return handler_context.config.grades
+
+
 async def _show_major_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     handler_context: HandlerContext = context.bot_data["handler_context"]
     grade = context.user_data.get(STATE_GRADE)
@@ -335,15 +549,27 @@ async def _show_major_management(update: Update, context: ContextTypes.DEFAULT_T
         await update.callback_query.edit_message_text("Please select a grade first.")
         return
 
+    show_edit = bool(
+        update.effective_user
+        and _is_management(update.effective_user.id, handler_context.config)
+    )
     majors = _fetch_majors(handler_context, grade)
     rows = []
     if majors:
-        rows.extend(
-            [simple_button(f"🗑️ {major}", f"major:delete:{major}")]
-            for major in majors
-        )
+        for major in majors:
+            if show_edit:
+                rows.append(
+                    [
+                        simple_button(f"✏️ {major}", f"major:edit:{major}"),
+                        simple_button(f"🗑️ {major}", f"major:delete:{major}"),
+                    ]
+                )
+            else:
+                rows.append([simple_button(f"🗑️ {major}", f"major:delete:{major}")])
     rows.append([simple_button("➕ Add Major", "major:add")])
-    rows.append([simple_button("⬅️ Back", "menu:students")])
+    source = context.user_data.get(STATE_MANAGE_MAJORS)
+    back_target = "menu:data" if source == "data" else "menu:students"
+    rows.append([simple_button("⬅️ Back", back_target)])
     keyboard = build_menu(rows)
     message = f"Manage majors for {grade}:"
     if update.callback_query:
@@ -354,9 +580,24 @@ async def _show_major_management(update: Update, context: ContextTypes.DEFAULT_T
 
 async def _start_add_major(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data[STATE_ADDING_MAJOR] = True
-    keyboard = build_menu([[simple_button("⬅️ Cancel", "menu:students")]])
+    source = context.user_data.get(STATE_MANAGE_MAJORS)
+    back_target = "menu:data" if source == "data" else "menu:students"
+    keyboard = build_menu([[simple_button("⬅️ Cancel", back_target)]])
     await update.callback_query.edit_message_text(
         "Send the new major name.",
+        reply_markup=keyboard,
+    )
+
+
+async def _start_edit_major(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, major: str
+) -> None:
+    context.user_data[STATE_EDITING_MAJOR] = major
+    source = context.user_data.get(STATE_MANAGE_MAJORS)
+    back_target = "menu:data" if source == "data" else "menu:students"
+    keyboard = build_menu([[simple_button("⬅️ Cancel", back_target)]])
+    await update.callback_query.edit_message_text(
+        f"Send the new name for major: {major}",
         reply_markup=keyboard,
     )
 
@@ -390,6 +631,47 @@ async def _handle_major_input(
     await _show_major_management(update, context)
 
 
+async def _handle_major_edit(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, handler_context: HandlerContext
+) -> None:
+    grade = context.user_data.get(STATE_GRADE)
+    old_major = context.user_data.get(STATE_EDITING_MAJOR)
+    if not grade or not old_major:
+        await update.message.reply_text("Please select a grade and major first.")
+        return
+
+    new_major = (update.message.text or "").strip()
+    if not new_major:
+        await update.message.reply_text("Please send a valid major name.")
+        return
+
+    with session_scope(handler_context.database) as session:
+        record = (
+            session.query(Major)
+            .filter(Major.grade == grade, Major.name == old_major)
+            .first()
+        )
+        if not record:
+            await update.message.reply_text("Major not found.")
+            return
+        existing = (
+            session.query(Major)
+            .filter(Major.grade == grade, Major.name == new_major)
+            .first()
+        )
+        if existing:
+            await update.message.reply_text("That major already exists for this grade.")
+            return
+        record.name = new_major
+        session.query(Student).filter(
+            Student.grade == grade, Student.major == old_major
+        ).update({Student.major: new_major})
+
+    context.user_data.pop(STATE_EDITING_MAJOR, None)
+    await update.message.reply_text(f"Updated major to: {new_major}")
+    await _show_major_management(update, context)
+
+
 async def _handle_teacher_input(
     update: Update, context: ContextTypes.DEFAULT_TYPE, handler_context: HandlerContext
 ) -> None:
@@ -417,6 +699,119 @@ async def _handle_teacher_input(
     context.user_data.pop(STATE_ADDING_TEACHER, None)
     await update.message.reply_text(f"Added teacher ID: {teacher_id}")
     await _show_management_menu(update, context)
+
+
+async def _show_grade_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    with session_scope(handler_context.database) as session:
+        grades = session.query(Grade).order_by(Grade.name.asc()).all()
+
+    rows = []
+    if grades:
+        for grade in grades:
+            rows.append(
+                [
+                    simple_button(f"✏️ {grade.name}", f"grade:edit:{grade.name}"),
+                    simple_button(f"🗑️ {grade.name}", f"grade:delete:{grade.name}"),
+                ]
+            )
+    rows.append([simple_button("➕ Add Grade", "grade:add")])
+    rows.append([simple_button("⬅️ Back", "menu:data")])
+    keyboard = build_menu(rows)
+    message = "Manage grades:"
+    if update.callback_query:
+        await update.callback_query.edit_message_text(message, reply_markup=keyboard)
+    else:
+        await update.message.reply_text(message, reply_markup=keyboard)
+
+
+async def _start_add_grade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data[STATE_ADDING_GRADE] = True
+    keyboard = build_menu([[simple_button("⬅️ Cancel", "menu:data")]])
+    await update.callback_query.edit_message_text(
+        "Send the new grade name (e.g., 10th).",
+        reply_markup=keyboard,
+    )
+
+
+async def _handle_grade_input(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, handler_context: HandlerContext
+) -> None:
+    grade = (update.message.text or "").strip()
+    if not grade:
+        await update.message.reply_text("Please send a valid grade name.")
+        return
+
+    with session_scope(handler_context.database) as session:
+        existing = session.query(Grade).filter(Grade.name == grade).first()
+        if existing:
+            await update.message.reply_text("That grade already exists.")
+            return
+        session.add(Grade(name=grade))
+
+    context.user_data.pop(STATE_ADDING_GRADE, None)
+    await update.message.reply_text(f"Added grade: {grade}")
+    await _show_grade_management(update, context)
+
+
+async def _start_edit_grade(update: Update, context: ContextTypes.DEFAULT_TYPE, grade: str) -> None:
+    context.user_data[STATE_EDITING_GRADE] = grade
+    keyboard = build_menu([[simple_button("⬅️ Cancel", "menu:data")]])
+    await update.callback_query.edit_message_text(
+        f"Send the new name for grade: {grade}",
+        reply_markup=keyboard,
+    )
+
+
+async def _handle_grade_edit(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, handler_context: HandlerContext
+) -> None:
+    old_grade = context.user_data.get(STATE_EDITING_GRADE)
+    if not old_grade:
+        await update.message.reply_text("Please select a grade first.")
+        return
+
+    new_grade = (update.message.text or "").strip()
+    if not new_grade:
+        await update.message.reply_text("Please send a valid grade name.")
+        return
+
+    with session_scope(handler_context.database) as session:
+        record = session.query(Grade).filter(Grade.name == old_grade).first()
+        if not record:
+            await update.message.reply_text("Grade not found.")
+            return
+        existing = session.query(Grade).filter(Grade.name == new_grade).first()
+        if existing:
+            await update.message.reply_text("That grade already exists.")
+            return
+        record.name = new_grade
+        session.query(Major).filter(Major.grade == old_grade).update({Major.grade: new_grade})
+        session.query(Student).filter(Student.grade == old_grade).update({Student.grade: new_grade})
+
+    context.user_data.pop(STATE_EDITING_GRADE, None)
+    await update.message.reply_text(f"Updated grade to: {new_grade}")
+    await _show_grade_management(update, context)
+
+
+async def _delete_grade(update: Update, context: ContextTypes.DEFAULT_TYPE, grade: str) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    with session_scope(handler_context.database) as session:
+        record = session.query(Grade).filter(Grade.name == grade).first()
+        if not record:
+            await update.callback_query.edit_message_text("Grade not found.")
+            return
+        has_students = session.query(Student).filter(Student.grade == grade).first()
+        has_majors = session.query(Major).filter(Major.grade == grade).first()
+        if has_students or has_majors:
+            await update.callback_query.edit_message_text(
+                "Cannot delete a grade with students or majors assigned.",
+                reply_markup=build_menu([[simple_button("⬅️ Back", "menu:data")]]),
+            )
+            return
+        session.delete(record)
+
+    await _show_grade_management(update, context)
 
 
 async def _delete_major(update: Update, context: ContextTypes.DEFAULT_TYPE, major: str) -> None:
@@ -474,6 +869,10 @@ async def _handle_major_selection(
         await _show_absence_list(update, context)
         return
 
+    if context.user_data.get(STATE_MANAGE_STUDENTS):
+        await _show_student_management_list(update, context)
+        return
+
     await _show_student_list(update, context)
 
 
@@ -482,6 +881,10 @@ async def _handle_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page:
 
     if context.user_data.get(STATE_ABSENCE_SELECTION):
         await _show_absence_list(update, context)
+        return
+
+    if context.user_data.get(STATE_MANAGE_STUDENTS):
+        await _show_student_management_list(update, context)
         return
 
     await _show_student_list(update, context)
@@ -571,7 +974,11 @@ async def _show_student_list(update: Update, context: ContextTypes.DEFAULT_TYPE)
     page = context.user_data.get(STATE_PAGE, 0)
 
     if not grade or not major:
-        await update.callback_query.edit_message_text("Please select grade and major.")
+        message = "Please select grade and major."
+        if update.callback_query:
+            await update.callback_query.edit_message_text(message)
+        else:
+            await update.message.reply_text(message)
         return
 
     with session_scope(handler_context.database) as session:
@@ -603,6 +1010,178 @@ async def _show_student_list(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.callback_query.edit_message_text(
         f"Students in {grade} - {major}:", reply_markup=keyboard
     )
+
+
+async def _show_student_management_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    grade = context.user_data.get(STATE_GRADE)
+    major = context.user_data.get(STATE_MAJOR)
+    page = context.user_data.get(STATE_PAGE, 0)
+
+    if not grade or not major:
+        await update.callback_query.edit_message_text("Please select grade and major.")
+        return
+
+    with session_scope(handler_context.database) as session:
+        students = (
+            session.query(Student)
+            .filter(Student.grade == grade, Student.major == major)
+            .order_by(Student.full_name.asc())
+            .all()
+        )
+
+    if not students:
+        message = "No students found for this class."
+        keyboard = build_menu([[simple_button("⬅️ Back", "data:students")]])
+        if update.callback_query:
+            await update.callback_query.edit_message_text(message, reply_markup=keyboard)
+        else:
+            await update.message.reply_text(message, reply_markup=keyboard)
+        return
+
+    max_page = max((len(students) - 1) // handler_context.config.page_size, 0)
+    page = min(page, max_page)
+    context.user_data[STATE_PAGE] = page
+
+    items = [
+        InlineKeyboardButton(
+            f"{student.full_name}", callback_data=f"student:manage:{student.id}"
+        )
+        for student in students
+    ]
+    keyboard = paginated_buttons(
+        items,
+        page,
+        handler_context.config.page_size,
+        "data:students",
+    )
+    message = f"Manage students in {grade} - {major}:"
+    if update.callback_query:
+        await update.callback_query.edit_message_text(message, reply_markup=keyboard)
+    else:
+        await update.message.reply_text(message, reply_markup=keyboard)
+
+
+async def _show_student_management_actions(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, student_id: str
+) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    with session_scope(handler_context.database) as session:
+        student = session.get(Student, student_id)
+
+    if not student:
+        await update.callback_query.edit_message_text("Student not found.")
+        return
+
+    keyboard = build_menu(
+        [
+            [simple_button("✏️ Edit Student", f"student:edit:{student.id}")],
+            [simple_button("🗑️ Delete Student", f"student:delete:{student.id}")],
+            [simple_button("⬅️ Back", "students:manage")],
+        ]
+    )
+    message = (
+        f"Student: {student.full_name}\n"
+        f"ID: {student.id}\n"
+        f"Grade: {student.grade}\n"
+        f"Major: {student.major}"
+    )
+    await update.callback_query.edit_message_text(message, reply_markup=keyboard)
+
+
+async def _start_edit_student(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, student_id: str
+) -> None:
+    context.user_data[STATE_EDITING_STUDENT] = student_id
+    keyboard = build_menu([[simple_button("⬅️ Cancel", "students:manage")]])
+    await update.callback_query.edit_message_text(
+        "Send updated student info in this format:\n"
+        "`Full Name, Grade, Major`\n"
+        "Example:\n"
+        "`Alex Johnson, 10th, Science`",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=keyboard,
+    )
+
+
+async def _handle_student_edit(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, handler_context: HandlerContext
+) -> None:
+    student_id = context.user_data.get(STATE_EDITING_STUDENT)
+    if not student_id:
+        await update.message.reply_text("Please select a student first.")
+        return
+
+    text = (update.message.text or "").strip()
+    if not text or "," not in text:
+        await update.message.reply_text(
+            "Please use the format: Full Name, Grade, Major."
+        )
+        return
+
+    parts = [part.strip() for part in text.split(",", 2)]
+    if len(parts) != 3 or not all(parts):
+        await update.message.reply_text(
+            "Please use the format: Full Name, Grade, Major."
+        )
+        return
+
+    full_name, grade, major = parts
+
+    with session_scope(handler_context.database) as session:
+        student = session.get(Student, student_id)
+        if not student:
+            await update.message.reply_text("Student not found.")
+            return
+        grade_record = session.query(Grade).filter(Grade.name == grade).first()
+        if not grade_record:
+            await update.message.reply_text("That grade does not exist.")
+            return
+        major_record = (
+            session.query(Major)
+            .filter(Major.grade == grade, Major.name == major)
+            .first()
+        )
+        if not major_record:
+            await update.message.reply_text("That major does not exist for the grade.")
+            return
+        duplicate = (
+            session.query(Student)
+            .filter(
+                Student.id != student_id,
+                Student.full_name == full_name,
+                Student.grade == grade,
+                Student.major == major,
+            )
+            .first()
+        )
+        if duplicate:
+            await update.message.reply_text(
+                "Another student already exists with that name, grade, and major."
+            )
+            return
+        student.full_name = full_name
+        student.grade = grade
+        student.major = major
+
+    context.user_data.pop(STATE_EDITING_STUDENT, None)
+    await update.message.reply_text("Student updated.")
+    await _show_student_management_list(update, context)
+
+
+async def _delete_student(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, student_id: str
+) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    with session_scope(handler_context.database) as session:
+        student = session.get(Student, student_id)
+        if not student:
+            await update.callback_query.edit_message_text("Student not found.")
+            return
+        session.query(Absence).filter(Absence.student_id == student_id).delete()
+        session.delete(student)
+
+    await _show_student_management_list(update, context)
 
 
 async def _show_absence_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -8,7 +8,7 @@ from pathlib import Path
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from absence_bot.config import ConfigError, load_config
-from absence_bot.database import create_database
+from absence_bot.database import create_database, seed_grades
 from absence_bot.handlers import (
     HandlerContext,
     handle_callback,
@@ -33,6 +33,7 @@ def build_application(config_path: str | Path) -> Application:
     application = Application.builder().token(config.token).build()
 
     application.bot_data["handler_context"] = HandlerContext(config=config, database=database)
+    seed_grades(database, config.grades)
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(handle_callback))
