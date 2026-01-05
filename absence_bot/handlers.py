@@ -272,8 +272,20 @@ async def _handle_student_input(
 
     added = 0
     skipped = 0
+    # Dedupe in-memory to avoid batch duplicates rolling back the transaction.
+    seen_ids: set[str] = set()
+    seen_name_keys: set[tuple[str, str, str]] = set()
+    unique_parsed: list[tuple[str, str]] = []
+    for student_id, full_name in parsed:
+        name_key = (full_name, grade, major)
+        if student_id in seen_ids or name_key in seen_name_keys:
+            skipped += 1
+            continue
+        seen_ids.add(student_id)
+        seen_name_keys.add(name_key)
+        unique_parsed.append((student_id, full_name))
     with session_scope(handler_context.database) as session:
-        for student_id, full_name in parsed:
+        for student_id, full_name in unique_parsed:
             existing = session.get(Student, student_id)
             if existing:
                 skipped += 1
