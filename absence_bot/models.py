@@ -24,6 +24,18 @@ class Student(Base):
     )
 
 
+class Major(Base):
+    __tablename__ = "majors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    grade: Mapped[str] = mapped_column(String(20), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("grade", "name", name="uq_major_grade_name"),
+    )
+
+
 class Absence(Base):
     __tablename__ = "absences"
 

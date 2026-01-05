@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import importlib.util
@@ -30,7 +30,7 @@ class BotConfig:
     token: str
     timezone: str
     authorized_teacher_ids: List[int]
-    grades: Dict[str, List[str]]
+    grades: List[str]
     page_size: int
     database: DatabaseConfig
 
@@ -56,9 +56,11 @@ def load_config(path: str | Path) -> BotConfig:
     ):
         raise ConfigError("authorized_teacher_ids must be a list of integers.")
 
-    grades = bot.get("grades", {})
-    if not isinstance(grades, dict) or not grades:
-        raise ConfigError("grades must be a mapping of grade names to majors.")
+    grades = bot.get("grades", [])
+    if not isinstance(grades, list) or not grades or not all(
+        isinstance(grade, str) for grade in grades
+    ):
+        raise ConfigError("grades must be a list of grade names.")
 
     timezone = str(bot.get("timezone", "UTC"))
     try:
@@ -70,7 +72,7 @@ def load_config(path: str | Path) -> BotConfig:
         token=str(bot.get("token", "")).strip(),
         timezone=timezone,
         authorized_teacher_ids=authorized_ids,
-        grades={str(grade): [str(major) for major in majors] for grade, majors in grades.items()},
+        grades=[str(grade) for grade in grades],
         page_size=int(bot.get("page_size", 10)),
         database=DatabaseConfig(
             engine=str(database.get("engine", "sqlite")),

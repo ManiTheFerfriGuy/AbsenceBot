@@ -7,11 +7,8 @@
 "authorized_teacher_ids" = [123456789, 987654321]
 # Number of students per page in inline menus
 "page_size" = 10
-
-[bot.grades]
-"10th Grade" = ["Computer Science", "Business", "Humanities"]
-"11th Grade" = ["Mathematics", "Physics", "Chemistry"]
-"12th Grade" = ["Engineering", "Biology", "Literature"]
+# Grades available in the bot (majors are managed in the bot UI)
+"grades" = ["10th Grade", "11th Grade", "12th Grade"]
 
 [database]
 # Supported engines: "mysql" or "sqlite"
