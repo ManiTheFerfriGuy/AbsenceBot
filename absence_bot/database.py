@@ -20,14 +20,7 @@ class Database:
 
 
 def _build_database_url(config: DatabaseConfig) -> str:
-    if config.engine == "mysql":
-        return (
-            f"mysql+pymysql://{config.user}:{config.password}"
-            f"@{config.host}:{config.port}/{config.name}"
-        )
-    if config.engine == "sqlite":
-        return f"sqlite:///{config.sqlite_path}"
-    raise ValueError(f"Unsupported database engine: {config.engine}")
+    return f"sqlite:///{config.sqlite_path}"
 
 
 def create_database(config: DatabaseConfig) -> Database:

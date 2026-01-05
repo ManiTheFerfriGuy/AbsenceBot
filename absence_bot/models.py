@@ -48,3 +48,9 @@ class Absence(Base):
     __table_args__ = (
         UniqueConstraint("student_id", "absence_date", name="uq_absence_student_day"),
     )
+
+
+class AuthorizedTeacher(Base):
+    __tablename__ = "authorized_teachers"
+
+    telegram_id: Mapped[int] = mapped_column(Integer, primary_key=True)

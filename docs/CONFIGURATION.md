@@ -9,6 +9,14 @@ All settings live in `config.toml`. Copy from `config.example.toml` and edit.
   ```toml
   authorized_teacher_ids = [123456789, 555555555]
   ```
+ - You can also add teacher IDs from the bot's **Management Tools** menu.
+
+## Management Access
+- Add admin user IDs under `bot.management_user_ids`.
+- Example:
+  ```toml
+  management_user_ids = [111111111]
+  ```
 
 ## Change Grades
 - Update `bot.grades`:
@@ -21,20 +29,9 @@ All settings live in `config.toml`. Copy from `config.example.toml` and edit.
 - Use **Manage Students → Manage Majors** to add or remove majors per grade.
 
 ## Database Settings
-- For MySQL:
+- SQLite database path:
   ```toml
   [database]
-  engine = "mysql"
-  host = "localhost"
-  port = 3306
-  name = "absence_bot"
-  user = "absence_bot"
-  password = "YOUR_PASSWORD"
-  ```
-- For SQLite (development):
-  ```toml
-  [database]
-  engine = "sqlite"
   sqlite_path = "absence_bot.sqlite3"
   ```
 

@@ -6,7 +6,7 @@ AbsenceBot is a production-ready Telegram bot for managing school absences. It u
 - Authorized-teacher access control
 - Student roster management by grade and major
 - Absence recording with duplicate prevention
-- MySQL or SQLite storage
+- SQLite storage
 - Clear documentation and testing report
 
 ## Quick Start

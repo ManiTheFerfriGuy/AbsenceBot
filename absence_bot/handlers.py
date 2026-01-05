@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from typing import Iterable, List, Optional
 
@@ -14,13 +17,14 @@ from telegram.ext import ContextTypes
 from absence_bot.config import BotConfig
 from absence_bot.database import Database, session_scope
 from absence_bot.keyboards import build_menu, paginated_buttons, simple_button
-from absence_bot.models import Absence, Major, Student
+from absence_bot.models import Absence, AuthorizedTeacher, Major, Student
 
 LOGGER = logging.getLogger(__name__)
 
 STATE_ADDING_STUDENTS = "adding_students"
 STATE_ABSENCE_SELECTION = "absence_selection"
 STATE_ADDING_MAJOR = "adding_major"
+STATE_ADDING_TEACHER = "adding_teacher"
 STATE_GRADE = "selected_grade"
 STATE_MANAGE_MAJORS = "manage_majors"
 STATE_MAJOR = "selected_major"
@@ -37,7 +41,8 @@ class HandlerContext:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_user:
         return
-    if not _is_authorized(update.effective_user.id, context.bot_data["handler_context"].config):
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    if not _is_authorized(update.effective_user.id, handler_context):
         await update.message.reply_text("🚫 You are not authorized to use this bot.")
         return
 
@@ -49,7 +54,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     handler_context: HandlerContext = context.bot_data["handler_context"]
-    if not _is_authorized(update.effective_user.id, handler_context.config):
+    if not _is_authorized(update.effective_user.id, handler_context):
         await update.message.reply_text("🚫 You are not authorized to use this bot.")
         return
 
@@ -71,6 +76,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "An unexpected error occurred. Please try again later."
             )
         return
+    if context.user_data.get(STATE_ADDING_TEACHER):
+        if not _is_management(update.effective_user.id, handler_context.config):
+            await update.message.reply_text("🚫 You are not authorized to manage teachers.")
+            context.user_data.pop(STATE_ADDING_TEACHER, None)
+            return
+        try:
+            await _handle_teacher_input(update, context, handler_context)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Error handling teacher input: %s", exc)
+            await update.message.reply_text(
+                "An unexpected error occurred. Please try again later."
+            )
+        return
 
     await update.message.reply_text("Please use the inline menu below.")
 
@@ -80,7 +98,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     handler_context: HandlerContext = context.bot_data["handler_context"]
-    if not _is_authorized(update.effective_user.id, handler_context.config):
+    if not _is_authorized(update.effective_user.id, handler_context):
         await update.callback_query.answer("Unauthorized", show_alert=True)
         return
 
@@ -107,6 +125,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 title="Select grade to manage majors",
                 back_target="menu:students",
             )
+            return
+        if data == "menu:management":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to access management tools."
+                )
+                return
+            context.user_data.clear()
+            await _show_management_menu(update, context)
             return
         if data == "menu:absence":
             context.user_data.clear()
@@ -142,6 +169,37 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if data == "absence:cancel":
             await _start_absence_flow(update, context)
             return
+        if data == "management:export":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to export the database."
+                )
+                return
+            await update.callback_query.edit_message_text(
+                "Preparing database export..."
+            )
+            await _send_database_backup(
+                context,
+                handler_context,
+                update.effective_user.id,
+                "📦 Manual database export",
+            )
+            await _show_management_menu(update, context)
+            return
+        if data == "management:add_teacher":
+            if not _is_management(update.effective_user.id, handler_context.config):
+                await update.callback_query.edit_message_text(
+                    "🚫 You are not authorized to manage teachers."
+                )
+                return
+            context.user_data.clear()
+            context.user_data[STATE_ADDING_TEACHER] = True
+            keyboard = build_menu([[simple_button("⬅️ Cancel", "menu:management")]])
+            await update.callback_query.edit_message_text(
+                "Send the teacher's Telegram user ID (numbers only).",
+                reply_markup=keyboard,
+            )
+            return
     except Exception as exc:  # noqa: BLE001
         LOGGER.exception("Error handling callback: %s", exc)
         await update.callback_query.edit_message_text(
@@ -153,10 +211,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def _show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    show_management = (
+        update.effective_user
+        and _is_management(update.effective_user.id, handler_context.config)
+    )
     keyboard = build_menu(
         [
             [simple_button("📚 Manage Students", "menu:students")],
             [simple_button("📝 Record Absence", "menu:absence")],
+            *(
+                [[simple_button("🛠️ Management", "menu:management")]]
+                if show_management
+                else []
+            ),
         ]
     )
     if update.message:
@@ -175,6 +243,20 @@ async def _show_student_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
     )
     await update.callback_query.edit_message_text("Student Management:", reply_markup=keyboard)
+
+
+async def _show_management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = build_menu(
+        [
+            [simple_button("📤 Export Database", "management:export")],
+            [simple_button("➕ Add Teacher ID", "management:add_teacher")],
+            [simple_button("⬅️ Back", "menu:main")],
+        ]
+    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text("Management Tools:", reply_markup=keyboard)
+    else:
+        await update.message.reply_text("Management Tools:", reply_markup=keyboard)
 
 
 async def _start_add_students(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -306,6 +388,35 @@ async def _handle_major_input(
     context.user_data.pop(STATE_ADDING_MAJOR, None)
     await update.message.reply_text(f"Added major: {major}")
     await _show_major_management(update, context)
+
+
+async def _handle_teacher_input(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, handler_context: HandlerContext
+) -> None:
+    text = (update.message.text or "").strip()
+    if not text.isdigit():
+        await update.message.reply_text("Please send a numeric Telegram user ID.")
+        return
+
+    teacher_id = int(text)
+    if teacher_id in handler_context.config.authorized_teacher_ids:
+        await update.message.reply_text("That teacher ID is already authorized.")
+        context.user_data.pop(STATE_ADDING_TEACHER, None)
+        await _show_management_menu(update, context)
+        return
+
+    with session_scope(handler_context.database) as session:
+        existing = session.get(AuthorizedTeacher, teacher_id)
+        if existing:
+            await update.message.reply_text("That teacher ID is already authorized.")
+            context.user_data.pop(STATE_ADDING_TEACHER, None)
+            await _show_management_menu(update, context)
+            return
+        session.add(AuthorizedTeacher(telegram_id=teacher_id))
+
+    context.user_data.pop(STATE_ADDING_TEACHER, None)
+    await update.message.reply_text(f"Added teacher ID: {teacher_id}")
+    await _show_management_menu(update, context)
 
 
 async def _delete_major(update: Update, context: ContextTypes.DEFAULT_TYPE, major: str) -> None:
@@ -606,5 +717,74 @@ async def _confirm_absences(
     await _show_main_menu(update, context)
 
 
-def _is_authorized(user_id: int, config: BotConfig) -> bool:
-    return user_id in config.authorized_teacher_ids
+def _resolve_database_path(config: BotConfig) -> Path:
+    return Path(config.database.sqlite_path).expanduser().resolve()
+
+
+def _create_database_backup(config: BotConfig) -> Path:
+    source_path = _resolve_database_path(config)
+    if not source_path.exists():
+        raise FileNotFoundError(f"Database file not found at {source_path}")
+
+    with tempfile.NamedTemporaryFile(prefix="absence_bot_backup_", suffix=".sqlite3", delete=False) as handle:
+        backup_path = Path(handle.name)
+
+    with sqlite3.connect(source_path) as source, sqlite3.connect(backup_path) as dest:
+        source.backup(dest)
+
+    return backup_path
+
+
+async def _send_database_backup(
+    context: ContextTypes.DEFAULT_TYPE,
+    handler_context: HandlerContext,
+    user_id: int,
+    caption: str,
+) -> None:
+    try:
+        backup_path = _create_database_backup(handler_context.config)
+    except FileNotFoundError:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="Database file not found. Please check the sqlite_path setting.",
+        )
+        return
+
+    try:
+        with backup_path.open("rb") as backup_file:
+            await context.bot.send_document(
+                chat_id=user_id,
+                document=backup_file,
+                filename=backup_path.name,
+                caption=caption,
+            )
+    finally:
+        backup_path.unlink(missing_ok=True)
+
+
+async def scheduled_database_export(context: ContextTypes.DEFAULT_TYPE) -> None:
+    handler_context: HandlerContext = context.bot_data["handler_context"]
+    recipients = handler_context.config.management_user_ids
+    if not recipients:
+        LOGGER.info("No management users configured for automatic exports.")
+        return
+
+    for user_id in recipients:
+        await _send_database_backup(
+            context,
+            handler_context,
+            user_id,
+            "⏰ Automated database export",
+        )
+
+
+def _is_management(user_id: int, config: BotConfig) -> bool:
+    return user_id in config.management_user_ids
+
+
+def _is_authorized(user_id: int, handler_context: HandlerContext) -> bool:
+    config = handler_context.config
+    if user_id in config.authorized_teacher_ids or user_id in config.management_user_ids:
+        return True
+    with session_scope(handler_context.database) as session:
+        return session.get(AuthorizedTeacher, user_id) is not None
