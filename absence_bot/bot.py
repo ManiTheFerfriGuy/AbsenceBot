@@ -38,12 +38,18 @@ def build_application(config_path: str | Path) -> Application:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.job_queue.run_repeating(
-        scheduled_database_export,
-        interval=timedelta(hours=12),
-        first=timedelta(hours=12),
-        name="automatic-database-export",
-    )
+    if application.job_queue is None:
+        LOGGER.warning(
+            "Job queue unavailable; scheduled database exports are disabled. "
+            "Install python-telegram-bot[job-queue] to enable them."
+        )
+    else:
+        application.job_queue.run_repeating(
+            scheduled_database_export,
+            interval=timedelta(hours=12),
+            first=timedelta(hours=12),
+            name="automatic-database-export",
+        )
 
     return application
 
