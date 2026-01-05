@@ -1,7 +1,9 @@
 """Main application setup for AbsenceBot."""
 from __future__ import annotations
 
+import argparse
 import logging
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -18,6 +20,9 @@ from absence_bot.handlers import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+DEFAULT_CONFIG_PATH = "config.toml"
+ENV_CONFIG_PATH = "ABSENCEBOT_CONFIG"
 
 
 def build_application(config_path: str | Path) -> Application:
@@ -64,3 +69,26 @@ def run(config_path: str | Path) -> None:
     application = build_application(config_path)
     LOGGER.info("Starting AbsenceBot")
     application.run_polling()
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run AbsenceBot with the provided config.")
+    parser.add_argument(
+        "config",
+        nargs="?",
+        default=os.getenv(ENV_CONFIG_PATH, DEFAULT_CONFIG_PATH),
+        help=(
+            "Path to the config TOML file. Defaults to config.toml or the "
+            "ABSENCEBOT_CONFIG environment variable."
+        ),
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    run(args.config)
+
+
+if __name__ == "__main__":
+    main()
